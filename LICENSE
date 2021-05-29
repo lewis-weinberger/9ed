@@ -1,6 +1,7 @@
 Copyright © 2021 Plan 9 Foundation
 Portions Copyright © 2001-2008 Russ Cox
 Portions Copyright © 2008-2009 Google Inc.
+Portions Copyright © 2021 Lewis Weinberger 
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
@@ -29,21 +30,3 @@ Lucent was bought by Alcatel, which was bought by Nokia.
 On March 23, 2021, Nokia announced the transfer of the Plan 9 copyrights to the
 Plan 9 Foundation, which in turn relicensed Plan 9 under the the MIT license,
 reproduced above.
-
-There are a few exceptions, noted with LICENSE files in their own directories:
-
-The bzip2 program uses the bzip2 license; see src/cmd/bzip2/LICENSE.
-
-The fonts from Bigelow and Holmes were licensed only for Plan 9 itself,
-not for derivatives like Plan 9 from User Space.
-
-Plan 9 from User Space arranged a separate agreement with B&H to include
-the bitmap fonts in the font/luc, font/lucm, font/lucsans, and font/pelm
-directories. Other bitmap fonts have other licenses. See font/LICENSE.
-
-The Lucida Sans Unicode PostScript fonts were licensed from B&H only for Plan 9
-itself, not derivatives like Plan 9 from User Space. In their place, Plan 9 from
-User Space provides Luxi Sans, also by B&H but available under a more liberal
-license, and Deja Vu, a Unicode extension of the Bitstream Vera family of fonts.
-Luxi Sans is similar to Lucida Sans, but it has no Unicode support.
-Deja Vu does have good Unicode support.

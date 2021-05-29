@@ -1,0 +1,8 @@
+*.a
+*.o
+src/**/o.*
+bin/acme
+bin/Mail
+bin/sam
+bin/samterm
+bin/devdraw

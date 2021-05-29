@@ -20,6 +20,6 @@ HFILES=\
 	$PLAN9/include/frame.h\
 	$PLAN9/include/draw.h\
 
-CFLAGS=$CFLAGS -I../sam
+CFLAGS=$CFLAGS -I../sam -I../../../include
 
 <$PLAN9/src/mkone

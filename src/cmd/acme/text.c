@@ -12,6 +12,7 @@
 #include <complete.h>
 #include "dat.h"
 #include "fns.h"
+#include "keyboard-extras.h"
 
 Image	*tagcols[NCOL];
 Image	*textcols[NCOL];
@@ -540,7 +541,7 @@ textbswidth(Text *t, Rune c)
 	int skipping;
 
 	/* there is known to be at least one character to erase */
-	if(c == 0x08)	/* ^H: erase character */
+	if(c == 0x08 || c == Kdel)	/* ^H or ^?: erase character */
 		return 1;
 	q = t->q0;
 	skipping = TRUE;
@@ -686,16 +687,44 @@ texttype(Text *t, Rune r)
 		if(t->q0 > 0)
 			textshow(t, t->q0-1, t->q0-1, TRUE);
 		return;
+	case Ksh + Kleft:	/* Shift + Left */
+		typecommit(t);
+		if(t->q0 > 0)
+			textshow(t, t->q0-1, t->q1, TRUE);
+		return;
 	case Kright:
 		typecommit(t);
 		if(t->q1 < t->file->b.nc)
 			textshow(t, t->q1+1, t->q1+1, TRUE);
 		return;
+	case Ksh + Kright:	/* Shift + Right */
+		typecommit(t);
+		if(t->q1 < t->file->b.nc)
+			textshow(t, t->q0, t->q1+1, TRUE);
+		return;
 	case Kdown:
+	case Ksh + Kdown:
 		if(t->what == Tag)
 			goto Tagdown;
-		n = t->fr.maxlines/3;
-		goto case_Down;
+		typecommit(t);
+		nnb = 0;
+		if(t->q0>0 && textreadc(t, t->q0-1)!='\n')
+			nnb = textbswidth(t, 0x15);
+		q1 = t->q1;
+		while(q1<t->file->b.nc && textreadc(t, q1)!='\n')
+			q1++;
+		if(q1<t->file->b.nc){
+			q1++;
+			while(q1<t->file->b.nc && nnb > 0 && textreadc(t, q1)!='\n') {
+				nnb--;
+				q1++;
+			}
+			if(r == Kdown)
+				textshow(t, q1, q1, TRUE);
+			else /* Shift + Down */
+				textshow(t, t->q0, q1, TRUE);
+		}
+		return;
 	case Kscrollonedown:
 		if(t->what == Tag)
 			goto Tagdown;
@@ -710,10 +739,26 @@ texttype(Text *t, Rune r)
 		textsetorigin(t, q0, TRUE);
 		return;
 	case Kup:
+	case Ksh + Kup:
 		if(t->what == Tag)
 			goto Tagup;
-		n = t->fr.maxlines/3;
-		goto case_Up;
+		typecommit(t);
+		nnb = 0;
+		if(t->q0>0 && textreadc(t, t->q0-1)!='\n')
+			nnb = textbswidth(t, 0x15);
+		q0 = t->q0 - nnb;
+		if(q0 > 0){
+			nb = q0;
+			q0--;
+			while(q0 > 0 && textreadc(t, q0-1)!='\n')
+				q0--;
+			q1 = (q0 + nnb >= nb) ? nb - 1 : q0 + nnb;
+			if(r == Kup)
+				textshow(t, q1, q1, TRUE);
+			else /* Shift + Up */
+				textshow(t, q1, t->q1, TRUE);
+		}
+		return;
 	case Kscrolloneup:
 		if(t->what == Tag)
 			goto Tagup;
@@ -753,6 +798,13 @@ texttype(Text *t, Rune r)
 			nnb = textbswidth(t, 0x15);
 		textshow(t, t->q0-nnb, t->q0-nnb, TRUE);
 		return;
+	case Ksh + (Kleft&0x9f):	/* Ctrl + Shift + Left */
+		typecommit(t);
+		nnb = 0;
+		if(t->q0>0 && textreadc(t, t->q0-1)!='\n')
+			nnb = textbswidth(t, 0x15);
+		textshow(t, t->q0-nnb, t->q1, TRUE);
+		return;
 	case 0x05:	/* ^E: end of line */
 		typecommit(t);
 		q0 = t->q0;
@@ -760,17 +812,39 @@ texttype(Text *t, Rune r)
 			q0++;
 		textshow(t, q0, q0, TRUE);
 		return;
+	case Ksh + (Kright&0x9f):	/* Ctrl + Shift + Right */
+		typecommit(t);
+		q1 = t->q1;
+		while(q1<t->file->b.nc && textreadc(t, q1)!='\n')
+			q1++;
+		textshow(t, t->q0, q1, TRUE);
+		return;
 	case Kcmd+'c':	/* %C: copy */
+	case Ketx:	/* ^C: copy */
 		typecommit(t);
 		cut(t, t, nil, TRUE, FALSE, nil, 0);
 		return;
 	case Kcmd+'z':	/* %Z: undo */
+	case Ksub:	/* ^Z: undo */
 	 	typecommit(t);
 		undo(t, nil, nil, TRUE, 0, nil, 0);
 		return;
 	case Kcmd+'Z':	/* %-shift-Z: redo */
+	case Keom:	/* ^Y: redo */
 	 	typecommit(t);
 		undo(t, nil, nil, FALSE, 0, nil, 0);
+		return;
+	case Kdc3:	/* ^S: put */
+		typecommit(t);
+		put(t, nil, nil, XXX, XXX, nil, 0);
+		return;
+	case Kcret:	/* Ctrl + Return */
+		typecommit(t);
+		execute(t, t->q0, t->q1, FALSE, nil);
+		return;
+	case Ksh + Kcret:	/* Ctrl + Shift + Return */
+		typecommit(t);
+		look3(t, t->q0, t->q1, FALSE);
 		return;
 
 	Tagdown:
@@ -797,6 +871,7 @@ texttype(Text *t, Rune r)
 	/* cut/paste must be done after the seq++/filemark */
 	switch(r){
 	case Kcmd+'x':	/* %X: cut */
+	case Kcan:	/* ^X: cut */
 		typecommit(t);
 		if(t->what == Body){
 			seq++;
@@ -807,6 +882,7 @@ texttype(Text *t, Rune r)
 		t->iq1 = t->q0;
 		return;
 	case Kcmd+'v':	/* %V: paste */
+	case Ksyn:	/* ^V: paste */
 		typecommit(t);
 		if(t->what == Body){
 			seq++;
@@ -844,6 +920,13 @@ texttype(Text *t, Rune r)
 			typecommit(t);
 		t->iq1 = t->q0;
 		return;
+	case Kdel:	/* ^? erase forwards */
+		if(t->q1 == t->file->b.nc) /* nothing to erase */
+			return;
+		nnb = textbswidth(t, r);
+		q0 = t->q1;
+		q1 = q0+nnb;
+		goto Erase;
 	case 0x08:	/* ^H: erase character */
 	case 0x15:	/* ^U: erase line */
 	case 0x17:	/* ^W: erase word */
@@ -859,6 +942,7 @@ texttype(Text *t, Rune r)
 		}
 		if(nnb <= 0)
 			return;
+	Erase:
 		for(i=0; i<t->file->ntext; i++){
 			u = t->file->text[i];
 			u->nofill = TRUE;
@@ -887,6 +971,15 @@ texttype(Text *t, Rune r)
 			textfill(t->file->text[i]);
 		t->iq1 = t->q0;
 		return;
+	case Ksh + Ketx:
+	case Ksh + Kdc3:
+	case Ksh + Ksyn:
+	case Ksh + Kcan:
+	case Ksh + Keom:
+	case Ksh + Ksub:
+	case Ksh + Kdel:
+		r -= Ksh; /* Send control codes without shift modifier */
+		break; /* fall through to insertion */
 	case '\n':
 		if(t->w->autoindent){
 			/* find beginning of previous line using backspace code */

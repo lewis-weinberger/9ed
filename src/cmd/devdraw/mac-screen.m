@@ -23,6 +23,7 @@
 #include "devdraw.h"
 #include "bigarrow.h"
 #include "glendapng.h"
+#include "keyboard-extras.h"
 
 AUTOFRAMEWORK(Cocoa)
 AUTOFRAMEWORK(Metal)
@@ -911,6 +912,23 @@ rpc_setmouse(Client *c, Point p)
 	k = keycvt(c);
 	LOG(@"keyDown: character0: 0x%x -> 0x%x", c, k);
 	m = [e modifierFlags];
+
+	if(m & NSEventModifierFlagControl){
+		k &= 0x9f;
+		if(k == '\n')
+			k = Kcret;
+	}
+
+	if(m & NSEventModifierFlagShift){
+		if(k == Kleft
+			|| k == Kright
+			|| k == Kdel
+			|| k == Kup
+			|| k == Kdown
+			|| k == Kcret
+			|| m & NSEventModifierFlagControl)
+		k += Ksh;
+	}
 
 	if(m & NSEventModifierFlagCommand){
 		if((m & NSEventModifierFlagShift) && 'a' <= k && k <= 'z')

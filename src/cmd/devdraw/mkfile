@@ -23,6 +23,8 @@ HFILES=\
 	latin1.h\
 	$WSYSHFILES\
 
+CFLAGS=$CFLAGS -I../../../include
+
 <$PLAN9/src/mkone
 
 $O.drawclient: drawclient.$O

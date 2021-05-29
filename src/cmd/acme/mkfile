@@ -30,6 +30,8 @@ HFILES=dat.h\
 	edit.h\
 	fns.h\
 
+CFLAGS=$CFLAGS -I../../../include
+
 <$PLAN9/src/mkone
 <$PLAN9/src/mkdirs
 

@@ -12,6 +12,7 @@
 #include <thread.h>
 #include "x11-memdraw.h"
 #include "devdraw.h"
+#include "keyboard-extras.h"
 
 #undef time
 
@@ -1234,10 +1235,30 @@ _xtoplan9kbd(XEvent *e)
 	if(k == XK_hyphen)
 		k = XK_minus;
 	/* Do control mapping ourselves if translator doesn't */
-	if(e->xkey.state&ControlMask)
+	if(e->xkey.state&ControlMask) {
 		k &= 0x9f;
+		if (k == '\n')
+			k = Kcret;
+	}
 	if(k == NoSymbol) {
 		return -1;
+	}
+
+	/* Mod4 + key */
+	if(e->xkey.state&Mod4Mask)
+		k += Kmod4;
+
+	/* Shift modified bindings */
+	if(e->xkey.state&ShiftMask) {
+		/* Ctrl + Shift + Key, Shift + Left/Right/Delete */
+		if(k == Kleft
+			|| k == Kright
+			|| k == Kdel
+			|| k == Kup
+			|| k == Kdown
+			|| k == Kcret
+			|| e->xkey.state&ControlMask)
+			k += Ksh;
 	}
 
 	return k+0;

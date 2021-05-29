@@ -8,6 +8,7 @@
 #include <frame.h>
 #include "flayer.h"
 #include "samterm.h"
+#include "keyboard-extras.h"
 
 Text	cmd;
 Rune	*scratch;
@@ -142,6 +143,10 @@ threadmain(int argc, char *argv[])
 					scroll(which, 3);
 				else
 					menu3hit();
+			}else if((mousep->buttons&(8|16))){
+				scroll(which, mousep->buttons&8 ? 8 : 16);
+			}else if(nwhich && nwhich!=which){
+				current(nwhich);
 			}
 			mouseunblock();
 		}
@@ -515,6 +520,15 @@ nontypingkey(int c)
 	case CUT:
 	case COPY:
 	case PASTE:
+	case Ketx:	/* ^C */
+	case Ksyn:	/* ^V */
+	case Kcan:	/* ^X */
+	case Ksh + Kleft:	/* Shift + Left */
+	case Ksh + Kright:	/* Shift + Right */
+	case Ksh + (Kleft&0x9f):	/* Ctrl + Shift + Left */
+	case Ksh + (Kright&0x9f):	/* Ctrl + Shift + Right */
+	case Ksh + Kup:	/* Shift + Up */
+	case Ksh + Kdown:	/* Shift + Down */
 		return 1;
 	}
 	return 0;
@@ -527,7 +541,7 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 	Rune buf[100];
 	Rune *p = buf;
 	int c, backspacing;
-	long a, a0;
+	long a, a0, a1, count;
 	int scrollkey;
 
 	scrollkey = 0;
@@ -555,7 +569,10 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 				break;
 			}
 		}
-		*p++ = c;
+		if(c==Ksh+Ketx || c==Ksh+Ksyn || c==Ksh+Kcan || c==Ksh+Kdel)
+			*p++ = c - Ksh;
+		else
+			*p++ = c;
 		if(autoindent)
 		if(c == '\n'){
 			/* autoindent */
@@ -588,28 +605,76 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 			flushtyping(0);
 		onethird(l, a);
 	}
-	if(c==SCROLLKEY || c==PAGEDOWN){
+	if(c==PAGEDOWN){
 		flushtyping(0);
 		center(l, l->origin+l->f.nchars+1);
-	}else if(c==BACKSCROLLKEY || c==PAGEUP){
+	}else if(c==PAGEUP){
 		flushtyping(0);
 		a0 = l->origin-l->f.nchars;
 		if(a0 < 0)
 			a0 = 0;
 		center(l, a0);
+	}else if(c == Kdown || c == Ksh + Kdown || c == Kup || c == Ksh + Kup){
+		flushtyping(1);
+		count = 0;
+		a0 = l->p0;
+		while(a0 > 0 && raspc(&t->rasp, a0-1)!='\n'){
+			a0--;
+			count++;
+		}
+		if(c == Kup || c == Ksh + Kup){
+			if(a0 > 0){
+				a1 = a0;
+				a0--;
+				while(a0 > 0 && raspc(&t->rasp, a0-1)!='\n')
+					a0--;
+				a0 = (a0 + count >= a1) ? a1 - 1 : a0 + count;
+				a1 = (c == Kup) ? a0 : l->p1;
+				flsetselect(l, a0, a1);
+				center(l, a0);
+			}
+		}else{
+			a1 = l->p1;
+			while(a1 < t->rasp.nrunes && raspc(&t->rasp, a1)!='\n')
+				a1++;
+			if(a1 < t->rasp.nrunes){
+				a1++;
+				while(a1 < t->rasp.nrunes && count > 0 && raspc(&t->rasp, a1)!='\n'){
+					count--;
+					a1++;
+				}
+				a0 = (c == Kdown) ? a1 : l->p0;
+				flsetselect(l, a0, a1);
+				center(l, a0);
+			}
+		}
 	}else if(c == RIGHTARROW){
 		flushtyping(0);
-		a0 = l->p0;
+		a0 = l->p1;
 		if(a0 < t->rasp.nrunes)
 			a0++;
 		flsetselect(l, a0, a0);
 		center(l, a0);
+	}else if(c == Ksh + RIGHTARROW){
+		flushtyping(0);
+		a1 = l->p1;
+		if(a1 < t->rasp.nrunes)
+			a1++;
+		flsetselect(l, l->p0, a1);
+		center(l, a1);
 	}else if(c == LEFTARROW){
 		flushtyping(0);
 		a0 = l->p0;
 		if(a0 > 0)
 			a0--;
 		flsetselect(l, a0, a0);
+		center(l, a0);
+	}else if(c == Ksh + LEFTARROW){
+		flushtyping(0);
+		a0 = l->p0;
+		if(a0 > 0)
+			a0--;
+		flsetselect(l, a0, l->p1);
 		center(l, a0);
 	}else if(c == HOMEKEY){
 		flushtyping(0);
@@ -629,12 +694,29 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 		for(l=t->l; l<&t->l[NL]; l++)
 			if(l->textfn)
 				flsetselect(l, l->p0, l->p1);
+	}else if(c == Ksh + (Kleft&0x9f) || c == Ksh + (Kright&0x9f)){
+		flushtyping(1);
+		if(c == Ksh + (Kleft&0x9f)){
+			while(a > 0 && raspc(&t->rasp, a-1)!='\n')
+				a--;
+			l->p0 = a;
+		}
+		else{
+			a = l->p1;
+			while(a < t->rasp.nrunes && raspc(&t->rasp, a)!='\n')
+				a++;
+			l->p1 = a;
+		}
+		flsetselect(l, l->p0, l->p1);
 	}else if(backspacing && !hostlock){
 		/* backspacing immediately after outcmd(): sorry */
-		if(l->f.p0>0 && a>0){
+		if(c == 0x7F){ /* del */
+			l->p0 = a;
+			if(a < t->rasp.nrunes)
+				l->p1 = a+1;
+		}else if(l->f.p0>0 && a>0){
 			switch(c){
 			case '\b':
-			case 0x7F:	/* del */
 				l->p0 = a-1;
 				break;
 			case 0x15:	/* ctrl-u */
@@ -645,29 +727,29 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 				break;
 			}
 			l->p1 = a;
-			if(l->p1 != l->p0){
-				/* cut locally if possible */
-				if(typestart<=l->p0 && l->p1<=typeend){
-					t->lock++;	/* to call hcut */
-					hcut(t->tag, l->p0, l->p1-l->p0);
-					/* hcheck is local because we know rasp is contiguous */
-					hcheck(t->tag);
-				}else{
-					flushtyping(0);
-					cut(t, t->front, 0, 1);
-				}
+		}
+		if(l->p1 != l->p0){
+			/* cut locally if possible */
+			if(typestart<=l->p0 && l->p1<=typeend){
+				t->lock++;	/* to call hcut */
+				hcut(t->tag, l->p0, l->p1-l->p0);
+				/* hcheck is local because we know rasp is contiguous */
+				hcheck(t->tag);
+			}else{
+				flushtyping(0);
+				cut(t, t->front, 0, 1);
 			}
-			if(typeesc >= l->p0)
-				typeesc = l->p0;
-			if(typestart >= 0){
-				if(typestart >= l->p0)
-					typestart = l->p0;
-				typeend = l->p0;
-				if(typestart == typeend){
-					typestart = -1;
-					typeend = -1;
-					modified = 0;
-				}
+		}
+		if(typeesc >= l->p0)
+			typeesc = l->p0;
+		if(typestart >= 0){
+			if(typestart >= l->p0)
+				typestart = l->p0;
+			typeend = l->p0;
+			if(typestart == typeend){
+				typestart = -1;
+				typeend = -1;
+				modified = 0;
 			}
 		}
 	}else{
@@ -681,14 +763,17 @@ type(Flayer *l, int res)	/* what a bloody mess this is */
 				flsetselect(l, l->p0, l->p1);
 		switch(c) {
 		case CUT:
+		case Kcan:
 			flushtyping(0);
 			cut(t, t->front, 1, 1);
 			break;
 		case COPY:
+		case Ketx:
 			flushtyping(0);
 			snarf(t, t->front);
 			break;
 		case PASTE:
+		case Ksyn:
 			flushtyping(0);
 			paste(t, t->front);
 			break;
