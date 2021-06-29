@@ -3,10 +3,15 @@
 
 PLAN9=/usr/local/plan9
 SHELL=$PLAN9/bin/rc
+FONT=UnifontMedium/12a
 
 acmeshell=$SHELL
-font=$PLAN9/font/lucsans/typeunicode.7.font
+font=/mnt/font/$FONT/font
 path=($path $PLAN9/bin)
 
 pgrep plumber > /dev/null || plumber &
-acme -c 1 -a -f $font $* -l acme.dump
+
+if (pgrep acme > /dev/null)
+	plumb -d edit $*
+if not
+	acme -c 1 -a -f $font $*
