@@ -923,6 +923,7 @@ texttype(Text *t, Rune r)
 	case Kdel:	/* ^? erase forwards */
 		if(t->q1 == t->file->b.nc) /* nothing to erase */
 			return;
+		typecommit(t);
 		nnb = textbswidth(t, r);
 		q0 = t->q1;
 		q1 = q0+nnb;
